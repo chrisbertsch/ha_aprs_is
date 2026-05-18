@@ -1,13 +1,17 @@
 {
   "domain": "aprs_is",
   "name": "APRS-IS",
-  "codeowners": ["@chrisbertsch"],
+  "codeowners": [
+    "@chrisbertsch"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/chrisbertsch/ha_aprs_is",
   "integration_type": "service",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/chrisbertsch/ha_aprs_is/issues",
-  "requirements": ["aprslib==0.7.2"],
+  "requirements": [
+    "aprslib==0.7.2"
+  ],
   "version": "0.1.0"
 }
