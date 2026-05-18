@@ -1,0 +1,4 @@
+# HA config lives in the ha-aprs-is-dev-config Docker volume — nothing to commit here.
+# config/ is kept as an empty placeholder so git tracks the directory.
+config/*
+!config/.gitkeep

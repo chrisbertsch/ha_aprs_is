@@ -1,0 +1,16 @@
+services:
+  homeassistant:
+    container_name: ha-aprs-is-dev
+    image: ghcr.io/home-assistant/home-assistant:2026.4.4
+    volumes:
+      - ha_config:/config
+      - ./configuration.yaml:/config/configuration.yaml:ro
+      - ../custom_components/aprs_is:/config/custom_components/aprs_is
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8123:8123"
+    restart: unless-stopped
+
+volumes:
+  ha_config:
+    name: ha-aprs-is-dev-config

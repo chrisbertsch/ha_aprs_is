@@ -1,0 +1,480 @@
+send_message:
+  name: Send APRS Message
+  description: Send a direct APRS message to a specific callsign.
+  fields:
+    to:
+      name: To
+      description: Destination callsign (e.g. W1ABC-9).
+      required: true
+      selector:
+        text:
+    message:
+      name: Message
+      description: Message text (max 67 characters).
+      required: true
+      selector:
+        text:
+          multiline: false
+    from_call:
+      name: From callsign
+      description: Override the sending callsign. Defaults to the configured login callsign.
+      required: false
+      selector:
+        text:
+
+send_bulletin:
+  name: Send APRS Bulletin
+  description: Send a numbered or named APRS bulletin.
+  fields:
+    bulletin_id:
+      name: Bulletin ID
+      description: "BLN0–BLN9 number or a name up to 5 characters (e.g. 0, 1, WEATHER)."
+      required: true
+      example: "0"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Bulletin text (max 67 characters).
+      required: true
+      selector:
+        text:
+          multiline: false
+    from_call:
+      name: From callsign
+      description: Override the sending callsign.
+      required: false
+      selector:
+        text:
+
+send_announcement:
+  name: Send APRS Announcement
+  description: "Send an APRS announcement (BLN_A–BLN_Z)."
+  fields:
+    announcement_id:
+      name: Announcement ID
+      description: Single letter A–Z.
+      required: true
+      example: "A"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Announcement text (max 67 characters).
+      required: true
+      selector:
+        text:
+          multiline: false
+    from_call:
+      name: From callsign
+      description: Override the sending callsign.
+      required: false
+      selector:
+        text:
+
+send_wx_report:
+  name: Send APRS Weather Report
+  description: Send an APRS weather report using values from Home Assistant sensors.
+  fields:
+    temperature_f:
+      name: "Temperature (°F)"
+      description: Outdoor temperature in Fahrenheit.
+      required: false
+      selector:
+        number:
+          min: -99
+          max: 999
+          unit_of_measurement: "°F"
+          mode: box
+    humidity:
+      name: "Humidity (%)"
+      description: Relative humidity 0–100.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: box
+    pressure_mb:
+      name: Pressure (mb)
+      description: Barometric pressure in millibars.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          unit_of_measurement: "mb"
+          mode: box
+    wind_dir:
+      name: "Wind direction (°)"
+      description: Wind direction 0–360.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 360
+          unit_of_measurement: "°"
+          mode: box
+    wind_speed_mph:
+      name: Wind speed (mph)
+      description: Sustained wind speed in mph.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 999
+          unit_of_measurement: "mph"
+          mode: box
+    wind_gust_mph:
+      name: Wind gust (mph)
+      description: Peak gust speed in mph.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 999
+          unit_of_measurement: "mph"
+          mode: box
+    rain_1h_hundredths:
+      name: Rain last 1h (0.01 in)
+      description: Rainfall in last hour in hundredths of an inch.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          unit_of_measurement: "0.01 in"
+          mode: box
+    rain_24h_hundredths:
+      name: Rain last 24h (0.01 in)
+      description: Rainfall in last 24 hours in hundredths of an inch.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          unit_of_measurement: "0.01 in"
+          mode: box
+    rain_midnight_hundredths:
+      name: Rain since midnight (0.01 in)
+      description: Rainfall since midnight in hundredths of an inch.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          unit_of_measurement: "0.01 in"
+          mode: box
+    luminosity:
+      name: "Luminosity (W/m²)"
+      description: Solar radiation in watts per square meter.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          unit_of_measurement: "W/m²"
+          mode: box
+    latitude:
+      name: Latitude
+      description: "Override the WX station latitude. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+          mode: box
+    longitude:
+      name: Longitude
+      description: "Override the WX station longitude. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+          mode: box
+    from_call:
+      name: From callsign
+      description: "Override the sending callsign (e.g. KE5YIM-13 for a dedicated WX callsign)."
+      required: false
+      selector:
+        text:
+
+send_object:
+  name: Send APRS Object
+  description: Create or update an APRS object on the map.
+  fields:
+    object_name:
+      name: Object name
+      description: Object identifier (max 9 characters).
+      required: true
+      selector:
+        text:
+    symbol_table:
+      name: Symbol table
+      description: "APRS symbol table character (/ or \\)."
+      required: false
+      example: "/"
+      selector:
+        text:
+    symbol_code:
+      name: Symbol code
+      description: APRS symbol code character.
+      required: false
+      example: ">"
+      selector:
+        text:
+    comment:
+      name: Comment
+      description: Optional comment appended to the object packet.
+      required: false
+      selector:
+        text:
+          multiline: false
+    latitude:
+      name: Latitude
+      description: "Decimal degrees. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+          mode: box
+    longitude:
+      name: Longitude
+      description: "Decimal degrees. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+          mode: box
+    from_call:
+      name: From callsign
+      description: Override the sending callsign.
+      required: false
+      selector:
+        text:
+
+delete_object:
+  name: Delete APRS Object
+  description: Kill an APRS object (sends a killed object packet).
+  fields:
+    object_name:
+      name: Object name
+      description: Name of the object to kill.
+      required: true
+      selector:
+        text:
+    from_call:
+      name: From callsign
+      description: Override the sending callsign.
+      required: false
+      selector:
+        text:
+
+send_wx_report_from_entities:
+  name: Send APRS Weather Report (from entities)
+  description: >
+    Send an APRS weather report by pointing to existing Home Assistant sensor entities.
+    Units are detected automatically and converted — use any temperature, pressure, or
+    speed sensor regardless of its unit system.
+  fields:
+    temperature_entity:
+      name: Temperature sensor
+      description: "Any temperature sensor (°C, °F, K). Converted to °F for the packet."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: temperature
+    humidity_entity:
+      name: Humidity sensor
+      description: Relative humidity sensor (%).
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: humidity
+    pressure_entity:
+      name: Pressure sensor
+      description: "Any pressure sensor (hPa, mb, inHg, PSI, kPa). Converted to mb."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: atmospheric_pressure
+            - domain: sensor
+              device_class: pressure
+    wind_dir_entity:
+      name: Wind direction sensor
+      description: Wind direction sensor (degrees).
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    wind_speed_entity:
+      name: Wind speed sensor
+      description: "Any speed sensor (mph, km/h, m/s, kn). Converted to mph."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    wind_gust_entity:
+      name: Wind gust sensor
+      description: "Any speed sensor (mph, km/h, m/s, kn). Converted to mph."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    rain_1h_entity:
+      name: Rain last 1h sensor
+      description: "Precipitation sensor for last hour (mm or in). Converted to hundredths of an inch."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    rain_24h_entity:
+      name: Rain last 24h sensor
+      description: "Precipitation sensor for last 24 hours (mm or in)."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    rain_midnight_entity:
+      name: Rain since midnight sensor
+      description: "Precipitation sensor since midnight (mm or in)."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    luminosity_entity:
+      name: Luminosity sensor
+      description: "Solar irradiance sensor (W/m²)."
+      required: false
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    latitude:
+      name: Latitude
+      description: "Override the WX station latitude. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+          mode: box
+    longitude:
+      name: Longitude
+      description: "Override the WX station longitude. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+          mode: box
+    from_call:
+      name: From callsign
+      description: "Override the sending callsign (e.g. KE5YIM-13 for a dedicated WX callsign)."
+      required: false
+      selector:
+        text:
+
+send_position:
+  name: Send APRS Position Report
+  description: Send an APRS position report for a callsign.
+  fields:
+    symbol_table:
+      name: Symbol table
+      description: "APRS symbol table character (/ or \\)."
+      required: false
+      example: "/"
+      selector:
+        text:
+    symbol_code:
+      name: Symbol code
+      description: "APRS symbol code character (e.g. > for car, - for house, / for dot)."
+      required: false
+      example: ">"
+      selector:
+        text:
+    comment:
+      name: Comment
+      description: Optional free-text comment appended to the position packet.
+      required: false
+      selector:
+        text:
+          multiline: false
+    speed_mph:
+      name: Speed (mph)
+      description: Speed in miles per hour. Encoded as knots in the packet.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 999
+          unit_of_measurement: "mph"
+          mode: box
+    course:
+      name: "Course (°)"
+      description: Direction of travel in degrees (0–360).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 360
+          unit_of_measurement: "°"
+          mode: box
+    altitude_ft:
+      name: Altitude (ft)
+      description: Altitude in feet above mean sea level.
+      required: false
+      selector:
+        number:
+          min: -999
+          max: 999999
+          unit_of_measurement: "ft"
+          mode: box
+    latitude:
+      name: Latitude
+      description: "Decimal degrees. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+          mode: box
+    longitude:
+      name: Longitude
+      description: "Decimal degrees. Defaults to your HA home location."
+      required: false
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+          mode: box
+    from_call:
+      name: From callsign
+      description: "Override the sending callsign (e.g. KE5YIM-9 for a mobile station)."
+      required: false
+      selector:
+        text:

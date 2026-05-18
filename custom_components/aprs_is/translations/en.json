@@ -1,0 +1,301 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "APRS-IS Connection",
+        "data": {
+          "callsign": "Callsign",
+          "passcode": "APRS-IS Passcode",
+          "host": "Server",
+          "port": "Port"
+        },
+        "data_description": {
+          "callsign": "Your amateur radio callsign, optionally with SSID (e.g. KE5YIM or KE5YIM-1).",
+          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled).",
+          "host": "APRS-IS server hostname.",
+          "port": "APRS-IS server port."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure APRS-IS Connection",
+        "data": {
+          "callsign": "Callsign",
+          "passcode": "APRS-IS Passcode",
+          "host": "Server",
+          "port": "Port"
+        },
+        "data_description": {
+          "callsign": "Your amateur radio callsign, optionally with SSID (e.g. KE5YIM or KE5YIM-1).",
+          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled).",
+          "host": "APRS-IS server hostname.",
+          "port": "APRS-IS server port."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the APRS-IS server. Check hostname and port.",
+      "invalid_callsign": "Invalid callsign format (e.g. KE5YIM or KE5YIM-1).",
+      "invalid_passcode": "Passcode must be a number between -1 and 99999."
+    },
+    "abort": {
+      "already_configured": "This callsign is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "APRS-IS Options",
+        "menu_options": {
+          "global": "Global settings",
+          "stations": "Stations",
+          "weather_stations": "Weather Stations",
+          "wx_beacon": "Weather Beacon"
+        }
+      },
+      "global": {
+        "title": "Global Settings",
+        "data": {
+          "range_filter_radius": "Range filter radius",
+          "filter_extra": "Extra filter terms (advanced)",
+          "event_rate_limit": "Event rate limit",
+          "beacon_interval": "Position beacon interval"
+        },
+        "data_description": {
+          "range_filter_radius": "Receive all APRS packets within this radius of your Home Assistant location. Set to 0 to disable. Combines with callsign-specific filters.",
+          "filter_extra": "Additional APRS-IS filter terms appended verbatim after the auto-generated filter. See aprs-is.net/javAPRSFilter.aspx for syntax.",
+          "event_rate_limit": "Maximum Home Assistant events fired per second. Set to 0 for unlimited. Entity state updates are never rate-limited.",
+          "beacon_interval": "Periodically transmit a position report for the login callsign using the Home Assistant home location and a house symbol. Set to 0 to disable."
+        }
+      },
+      "stations": {
+        "title": "Stations",
+        "menu_options": {
+          "add_station": "Add station",
+          "edit_station": "Edit station",
+          "remove_station": "Remove station"
+        }
+      },
+      "add_station": {
+        "title": "Add Station",
+        "description": "Add any APRS callsign to track. Stations sharing the base callsign {base_callsign} are considered your stations.",
+        "data": {
+          "callsign": "Callsign",
+          "position_type": "Position tracking"
+        },
+        "data_description": {
+          "callsign": "Any amateur radio callsign with optional SSID (e.g. W1ABC-9).",
+          "position_type": "How to show this station's position in Home Assistant."
+        }
+      },
+      "edit_station": {
+        "title": "Edit Station",
+        "data": {
+          "callsign": "Callsign"
+        },
+        "data_description": {
+          "callsign": "Select the station to edit."
+        }
+      },
+      "edit_station_form": {
+        "title": "Edit {callsign}",
+        "data": {
+          "position_type": "Position tracking"
+        },
+        "data_description": {
+          "position_type": "How to show this station's position in Home Assistant."
+        }
+      },
+      "remove_station": {
+        "title": "Remove Station",
+        "data": {
+          "callsign": "Callsign"
+        },
+        "data_description": {
+          "callsign": "Select the station to remove."
+        }
+      },
+      "weather_stations": {
+        "title": "Weather Stations",
+        "menu_options": {
+          "add_weather_station": "Add weather station",
+          "remove_weather_station": "Remove weather station"
+        }
+      },
+      "add_weather_station": {
+        "title": "Add Weather Station",
+        "data": {
+          "callsign": "Callsign"
+        },
+        "data_description": {
+          "callsign": "Callsign of the APRS weather station (e.g. KE5YIM-13). Weather sensors and a weather entity will be created. Can be any callsign — not limited to your own."
+        }
+      },
+      "remove_weather_station": {
+        "title": "Remove Weather Station",
+        "data": {
+          "callsign": "Callsign"
+        },
+        "data_description": {
+          "callsign": "Select the weather station to remove."
+        }
+      },
+      "wx_beacon": {
+        "title": "Weather Beacon",
+        "data": {
+          "wx_beacon_interval": "WX beacon interval",
+          "wx_beacon_from_call": "From callsign",
+          "wx_beacon_comment": "Comment",
+          "wx_beacon_latitude": "Latitude override",
+          "wx_beacon_longitude": "Longitude override",
+          "wx_ent_temp": "Temperature sensor",
+          "wx_ent_humidity": "Humidity sensor",
+          "wx_ent_pressure": "Pressure sensor",
+          "wx_ent_wind_dir": "Wind direction sensor",
+          "wx_ent_wind_speed": "Wind speed sensor",
+          "wx_ent_wind_gust": "Wind gust sensor",
+          "wx_ent_rain_1h": "Rain last 1h sensor",
+          "wx_ent_rain_24h": "Rain last 24h sensor",
+          "wx_ent_rain_midnight": "Rain since midnight sensor",
+          "wx_ent_luminosity": "Luminosity sensor",
+          "wx_staleness_entity": "Staleness sentinel entity",
+          "wx_staleness_max_age": "Max data age"
+        },
+        "data_description": {
+          "wx_beacon_interval": "Automatically transmit a weather report at this interval. Set to 0 to disable.",
+          "wx_beacon_from_call": "Callsign to send the beacon as (e.g. KE5YIM-13). Leave blank to use the login callsign.",
+          "wx_beacon_comment": "Free-text comment appended to the weather packet. Defaults to \"Home Assistant\".",
+          "wx_beacon_latitude": "Override the WX station latitude. Leave blank to use the Home Assistant home location.",
+          "wx_beacon_longitude": "Override the WX station longitude. Leave blank to use the Home Assistant home location.",
+          "wx_ent_temp": "Any temperature sensor (°C, °F, K). Converted to °F for the packet.",
+          "wx_ent_humidity": "Relative humidity sensor (%).",
+          "wx_ent_pressure": "Any pressure sensor (hPa, mb, inHg, PSI, kPa). Converted to mb.",
+          "wx_ent_wind_dir": "Wind direction sensor (degrees).",
+          "wx_ent_wind_speed": "Any speed sensor (mph, km/h, m/s, kn). Converted to mph.",
+          "wx_ent_wind_gust": "Any speed sensor (mph, km/h, m/s, kn). Converted to mph.",
+          "wx_ent_rain_1h": "Precipitation sensor for last hour (mm or in).",
+          "wx_ent_rain_24h": "Precipitation sensor for last 24 hours (mm or in).",
+          "wx_ent_rain_midnight": "Precipitation sensor since midnight (mm or in).",
+          "wx_ent_luminosity": "Solar irradiance sensor (W/m²).",
+          "wx_staleness_entity": "Optional. If this entity has not updated within the max age, the beacon is skipped. Leave blank to always send.",
+          "wx_staleness_max_age": "How old the staleness entity's last update can be before the beacon is suppressed."
+        }
+      }
+    },
+    "error": {
+      "invalid_callsign": "Invalid callsign format. Use your callsign with optional SSID (e.g. KE5YIM or KE5YIM-9).",
+      "already_configured": "This callsign is already configured."
+    }
+  },
+  "services": {
+    "send_message": {
+      "name": "Send APRS Message",
+      "description": "Send a direct APRS message to a specific callsign.",
+      "fields": {
+        "to": { "name": "To", "description": "Destination callsign (e.g. W1ABC-9)." },
+        "message": { "name": "Message", "description": "Message text (max 67 characters)." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign. Defaults to the configured login callsign." }
+      }
+    },
+    "send_bulletin": {
+      "name": "Send APRS Bulletin",
+      "description": "Send a numbered or named APRS bulletin.",
+      "fields": {
+        "bulletin_id": { "name": "Bulletin ID", "description": "BLN0–BLN9 number or a name up to 5 characters (e.g. 0, 1, WEATHER)." },
+        "message": { "name": "Message", "description": "Bulletin text (max 67 characters)." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+      }
+    },
+    "send_announcement": {
+      "name": "Send APRS Announcement",
+      "description": "Send an APRS announcement (BLN_A–BLN_Z).",
+      "fields": {
+        "announcement_id": { "name": "Announcement ID", "description": "Single letter A–Z." },
+        "message": { "name": "Message", "description": "Announcement text (max 67 characters)." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+      }
+    },
+    "send_wx_report": {
+      "name": "Send APRS Weather Report",
+      "description": "Send an APRS weather report using values from Home Assistant sensors.",
+      "fields": {
+        "temperature_f": { "name": "Temperature (°F)", "description": "Outdoor temperature in Fahrenheit." },
+        "humidity": { "name": "Humidity (%)", "description": "Relative humidity 0–100." },
+        "pressure_mb": { "name": "Pressure (mb)", "description": "Barometric pressure in millibars." },
+        "wind_speed_mph": { "name": "Wind speed (mph)", "description": "Sustained wind speed in mph." },
+        "wind_dir": { "name": "Wind direction (°)", "description": "Wind direction 0–360." },
+        "wind_gust_mph": { "name": "Wind gust (mph)", "description": "Peak gust speed in mph." },
+        "rain_1h_hundredths": { "name": "Rain last 1h (0.01 in)", "description": "Rainfall in last hour in hundredths of an inch." },
+        "rain_24h_hundredths": { "name": "Rain last 24h (0.01 in)", "description": "Rainfall in last 24 hours in hundredths of an inch." },
+        "rain_midnight_hundredths": { "name": "Rain since midnight (0.01 in)", "description": "Rainfall since midnight in hundredths of an inch." },
+        "luminosity": { "name": "Luminosity (W/m²)", "description": "Solar radiation in watts per square meter." },
+        "latitude": { "name": "Latitude", "description": "Override the WX station latitude. Defaults to your HA home location." },
+        "longitude": { "name": "Longitude", "description": "Override the WX station longitude. Defaults to your HA home location." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." }
+      }
+    },
+    "send_object": {
+      "name": "Send APRS Object",
+      "description": "Create or update an APRS object on the map.",
+      "fields": {
+        "object_name": { "name": "Object name", "description": "Object identifier (max 9 characters)." },
+        "latitude": { "name": "Latitude", "description": "Decimal degrees. Defaults to the Home Assistant home location." },
+        "longitude": { "name": "Longitude", "description": "Decimal degrees. Defaults to the Home Assistant home location." },
+        "symbol_table": { "name": "Symbol table", "description": "APRS symbol table character (/ or \\)." },
+        "symbol_code": { "name": "Symbol code", "description": "APRS symbol code character." },
+        "comment": { "name": "Comment", "description": "Optional comment appended to the object packet." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+      }
+    },
+    "delete_object": {
+      "name": "Delete APRS Object",
+      "description": "Kill an APRS object (sends a killed object packet).",
+      "fields": {
+        "object_name": { "name": "Object name", "description": "Name of the object to kill." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+      }
+    },
+    "send_wx_report_from_entities": {
+      "name": "Send APRS Weather Report (from entities)",
+      "description": "Send an APRS weather report by pointing to existing Home Assistant sensor entities. Units are detected automatically and converted.",
+      "fields": {
+        "temperature_entity": { "name": "Temperature sensor", "description": "Any temperature sensor (°C, °F, K). Converted to °F for the packet." },
+        "humidity_entity": { "name": "Humidity sensor", "description": "Relative humidity sensor (%)." },
+        "pressure_entity": { "name": "Pressure sensor", "description": "Any pressure sensor (hPa, mb, inHg, PSI, kPa). Converted to mb." },
+        "wind_speed_entity": { "name": "Wind speed sensor", "description": "Any speed sensor (mph, km/h, m/s, kn). Converted to mph." },
+        "wind_dir_entity": { "name": "Wind direction sensor", "description": "Wind direction sensor (degrees)." },
+        "wind_gust_entity": { "name": "Wind gust sensor", "description": "Any speed sensor (mph, km/h, m/s, kn). Converted to mph." },
+        "rain_1h_entity": { "name": "Rain last 1h sensor", "description": "Precipitation sensor for last hour (mm or in)." },
+        "rain_24h_entity": { "name": "Rain last 24h sensor", "description": "Precipitation sensor for last 24 hours (mm or in)." },
+        "rain_midnight_entity": { "name": "Rain since midnight sensor", "description": "Precipitation sensor since midnight (mm or in)." },
+        "luminosity_entity": { "name": "Luminosity sensor", "description": "Solar irradiance sensor (W/m²)." },
+        "latitude": { "name": "Latitude", "description": "Override the WX station latitude. Defaults to your HA home location." },
+        "longitude": { "name": "Longitude", "description": "Override the WX station longitude. Defaults to your HA home location." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." }
+      }
+    },
+    "send_position": {
+      "name": "Send APRS Position Report",
+      "description": "Send an APRS position report for a callsign.",
+      "fields": {
+        "latitude": { "name": "Latitude", "description": "Decimal degrees. Defaults to the Home Assistant home location." },
+        "longitude": { "name": "Longitude", "description": "Decimal degrees. Defaults to the Home Assistant home location." },
+        "symbol_table": { "name": "Symbol table", "description": "APRS symbol table character (/ or \\)." },
+        "symbol_code": { "name": "Symbol code", "description": "APRS symbol code character (e.g. > for car, - for house, / for dot)." },
+        "comment": { "name": "Comment", "description": "Optional free-text comment appended to the position packet." },
+        "speed_mph": { "name": "Speed (mph)", "description": "Speed in miles per hour. Encoded as knots in the packet." },
+        "course": { "name": "Course (°)", "description": "Direction of travel in degrees (0–360)." },
+        "altitude_ft": { "name": "Altitude (ft)", "description": "Altitude in feet above mean sea level." },
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-9 for a mobile station)." }
+      }
+    }
+  },
+  "selector": {
+    "position_type": {
+      "options": {
+        "none": "None — packet count and last-seen only. Good for stations you just want to know are active.",
+        "device_tracker": "Device Tracker — integrates with HA zones and presence detection. Use this for your callsigns or people you want to trigger automations based on home/away status.",
+        "geo_location": "Map Pin (Geo Location) — shows a position pin on the HA map with no zone integration. Good for other APRS stations you want to see visually without affecting automations."
+      }
+    }
+  }
+}
