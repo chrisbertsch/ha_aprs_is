@@ -5,30 +5,22 @@
         "title": "APRS-IS Connection",
         "data": {
           "callsign": "Callsign",
-          "passcode": "APRS-IS Passcode",
-          "host": "Server",
-          "port": "Port"
+          "passcode": "APRS-IS Passcode"
         },
         "data_description": {
           "callsign": "Your amateur radio callsign, optionally with SSID (e.g. KE5YIM or KE5YIM-1).",
-          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled).",
-          "host": "APRS-IS server hostname.",
-          "port": "APRS-IS server port."
+          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled)."
         }
       },
       "reconfigure": {
         "title": "Reconfigure APRS-IS Connection",
         "data": {
           "callsign": "Callsign",
-          "passcode": "APRS-IS Passcode",
-          "host": "Server",
-          "port": "Port"
+          "passcode": "APRS-IS Passcode"
         },
         "data_description": {
           "callsign": "Your amateur radio callsign, optionally with SSID (e.g. KE5YIM or KE5YIM-1).",
-          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled).",
-          "host": "APRS-IS server hostname.",
-          "port": "APRS-IS server port."
+          "passcode": "Your APRS-IS passcode. Use -1 for receive-only mode (outbound actions will be disabled)."
         }
       }
     },
@@ -46,25 +38,58 @@
       "init": {
         "title": "APRS-IS Options",
         "menu_options": {
-          "global": "Global settings",
+          "aprs_is": "APRS-IS",
+          "kiss_tnc": "KISS TNC",
+          "station_beacon": "Station Beacon",
+          "wx_beacon": "Weather Beacon",
           "stations": "Stations",
-          "weather_stations": "Weather Stations",
-          "wx_beacon": "Weather Beacon"
+          "weather_stations": "Weather Stations"
         }
       },
-      "global": {
-        "title": "Global Settings",
+      "aprs_is": {
+        "title": "APRS-IS",
+        "description": "Connection settings for the APRS-IS internet network. Leave host empty to disable APRS-IS and use KISS TNC only.",
         "data": {
-          "range_filter_radius": "Range filter radius",
-          "filter_extra": "Extra filter terms (advanced)",
-          "event_rate_limit": "Event rate limit",
-          "beacon_interval": "Position beacon interval"
+          "host": "Server",
+          "port": "Port",
+          "event_rate_limit": "Event rate limit"
         },
         "data_description": {
-          "range_filter_radius": "Receive all APRS packets within this radius of your Home Assistant location. Set to 0 to disable. Combines with callsign-specific filters.",
-          "filter_extra": "Additional APRS-IS filter terms appended verbatim after the auto-generated filter. See aprs-is.net/javAPRSFilter.aspx for syntax.",
-          "event_rate_limit": "Maximum Home Assistant events fired per second. Set to 0 for unlimited. Entity state updates are never rate-limited.",
-          "beacon_interval": "Periodically transmit a position report for the login callsign using the Home Assistant home location and a house symbol. Set to 0 to disable."
+          "host": "APRS-IS server hostname (e.g. rotate.aprs.net). Leave empty to disable the APRS-IS connection entirely.",
+          "port": "APRS-IS server port.",
+          "event_rate_limit": "Maximum Home Assistant events fired per second per station. Set to 0 for unlimited. Entity state updates are never rate-limited."
+        }
+      },
+      "kiss_tnc": {
+        "title": "KISS TNC",
+        "description": "Optional local KISS TNC via TCP (e.g. Direwolf). Leave host empty to disable.",
+        "data": {
+          "kiss_host": "Host",
+          "kiss_port": "Port",
+          "kiss_rf_path": "RF digipeater path",
+          "tx_primary": "Primary transmit transport"
+        },
+        "data_description": {
+          "kiss_host": "Hostname or IP of the KISS TNC (e.g. localhost). Leave empty to disable.",
+          "kiss_port": "TCP port (Direwolf default: 8001).",
+          "kiss_rf_path": "AX.25 digipeater path for outbound RF packets (e.g. WIDE1-1,WIDE2-1).",
+          "tx_primary": "Which transport to use first for outbound packets. The other is used as fallback if the primary is unavailable."
+        }
+      },
+      "station_beacon": {
+        "title": "Station Beacon",
+        "description": "Periodically transmit a position report for the login callsign using the Home Assistant home location. Set interval to 0 to disable.",
+        "data": {
+          "beacon_interval": "Beacon interval",
+          "beacon_comment": "Comment",
+          "beacon_symbol": "APRS symbol",
+          "beacon_transport": "Transport"
+        },
+        "data_description": {
+          "beacon_interval": "How often to transmit a position beacon. Set to 0 to disable.",
+          "beacon_comment": "Free-text comment appended to the position packet.",
+          "beacon_symbol": "Two-character APRS symbol (table + code). Examples: /- = house, /> = car, /k = truck.",
+          "beacon_transport": "Which transport to use for the beacon. Auto respects the TX primary setting. Both sends on APRS-IS and KISS TNC simultaneously."
         }
       },
       "stations": {
@@ -142,7 +167,7 @@
       "wx_beacon": {
         "title": "Weather Beacon",
         "data": {
-          "wx_beacon_interval": "WX beacon interval",
+          "wx_beacon_interval": "Beacon interval",
           "wx_beacon_from_call": "From callsign",
           "wx_beacon_comment": "Comment",
           "wx_beacon_latitude": "Latitude override",
@@ -158,7 +183,8 @@
           "wx_ent_rain_midnight": "Rain since midnight sensor",
           "wx_ent_luminosity": "Luminosity sensor",
           "wx_staleness_entity": "Staleness sentinel entity",
-          "wx_staleness_max_age": "Max data age"
+          "wx_staleness_max_age": "Max data age",
+          "wx_beacon_transport": "Transport"
         },
         "data_description": {
           "wx_beacon_interval": "Automatically transmit a weather report at this interval. Set to 0 to disable.",
@@ -176,8 +202,9 @@
           "wx_ent_rain_24h": "Precipitation sensor for last 24 hours (mm or in).",
           "wx_ent_rain_midnight": "Precipitation sensor since midnight (mm or in).",
           "wx_ent_luminosity": "Solar irradiance sensor (W/m²).",
-          "wx_staleness_entity": "Optional. If this entity has not updated within the max age, the beacon is skipped. Leave blank to always send.",
-          "wx_staleness_max_age": "How old the staleness entity's last update can be before the beacon is suppressed."
+          "wx_staleness_entity": "Optional. If set, this entity must have updated within the max data age or the beacon is suppressed — useful for an uptime sensor. If not set, at least one configured sensor entity must have updated within the interval.",
+          "wx_staleness_max_age": "How old the staleness entity's last update (or any configured sensor) can be before the beacon is skipped.",
+          "wx_beacon_transport": "Which transport to use for the beacon. Auto respects the TX primary setting. Both sends on APRS-IS and KISS TNC simultaneously."
         }
       }
     },
@@ -192,6 +219,20 @@
         "none": "None — packet count and last-seen only. Good for stations you just want to know are active.",
         "device_tracker": "Device Tracker — integrates with HA zones and presence detection. Use this for your callsigns or people you want to trigger automations based on home/away status.",
         "geo_location": "Map Pin (Geo Location) — shows a position pin on the HA map with no zone integration. Good for other APRS stations you want to see visually without affecting automations."
+      }
+    },
+    "tx_primary": {
+      "options": {
+        "aprs_is": "APRS-IS (internet)",
+        "kiss_tnc": "KISS TNC (RF)"
+      }
+    },
+    "transport": {
+      "options": {
+        "auto": "Auto (primary with fallback)",
+        "both": "Both (APRS-IS + KISS TNC)",
+        "aprs_is": "APRS-IS",
+        "kiss_tnc": "KISS TNC (RF)"
       }
     }
   },
@@ -211,6 +252,14 @@
         "from_call": {
           "name": "From callsign",
           "description": "Override the sending callsign. Defaults to the configured login callsign."
+        },
+        "transport": {
+          "name": "Transport",
+          "description": "Which transport to use. Auto = primary with automatic fallback. Both is not available for messages — use auto, aprs_is, or kiss_tnc."
+        },
+        "nogate": {
+          "name": "NOGATE",
+          "description": "Append NOGATE to the AX.25 path, instructing IGates not to forward to the internet. Only applies when transmitting via KISS TNC."
         }
       }
     },
@@ -229,6 +278,14 @@
         "from_call": {
           "name": "From callsign",
           "description": "Override the sending callsign."
+        },
+        "transport": {
+          "name": "Transport",
+          "description": "Which transport to use. Auto = primary with automatic fallback to the other."
+        },
+        "nogate": {
+          "name": "NOGATE",
+          "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC."
         }
       }
     },
@@ -247,6 +304,14 @@
         "from_call": {
           "name": "From callsign",
           "description": "Override the sending callsign."
+        },
+        "transport": {
+          "name": "Transport",
+          "description": "Which transport to use. Auto = primary with automatic fallback to the other."
+        },
+        "nogate": {
+          "name": "NOGATE",
+          "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC."
         }
       }
     },
@@ -266,7 +331,9 @@
         "luminosity": { "name": "Luminosity (W/m²)", "description": "Solar radiation in watts per square meter." },
         "latitude": { "name": "Latitude", "description": "Override the WX station latitude. Defaults to your HA home location." },
         "longitude": { "name": "Longitude", "description": "Override the WX station longitude. Defaults to your HA home location." },
-        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." }
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." },
+        "transport": { "name": "Transport", "description": "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy when APRS-IS is connected)." },
+        "nogate": { "name": "NOGATE", "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both." }
       }
     },
     "send_object": {
@@ -279,7 +346,9 @@
         "symbol_table": { "name": "Symbol table", "description": "APRS symbol table character (/ or \\)." },
         "symbol_code": { "name": "Symbol code", "description": "APRS symbol code character." },
         "comment": { "name": "Comment", "description": "Optional comment appended to the object packet." },
-        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." },
+        "transport": { "name": "Transport", "description": "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy when APRS-IS is connected)." },
+        "nogate": { "name": "NOGATE", "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both." }
       }
     },
     "delete_object": {
@@ -287,7 +356,9 @@
       "description": "Kill an APRS object (sends a killed object packet).",
       "fields": {
         "object_name": { "name": "Object name", "description": "Name of the object to kill." },
-        "from_call": { "name": "From callsign", "description": "Override the sending callsign." }
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign." },
+        "transport": { "name": "Transport", "description": "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy when APRS-IS is connected)." },
+        "nogate": { "name": "NOGATE", "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both." }
       }
     },
     "send_wx_report_from_entities": {
@@ -306,7 +377,9 @@
         "luminosity_entity": { "name": "Luminosity sensor", "description": "Solar irradiance sensor (W/m²)." },
         "latitude": { "name": "Latitude", "description": "Override the WX station latitude. Defaults to your HA home location." },
         "longitude": { "name": "Longitude", "description": "Override the WX station longitude. Defaults to your HA home location." },
-        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." }
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-13 for a WX callsign)." },
+        "transport": { "name": "Transport", "description": "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy when APRS-IS is connected)." },
+        "nogate": { "name": "NOGATE", "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both." }
       }
     },
     "send_position": {
@@ -321,7 +394,9 @@
         "speed_mph": { "name": "Speed (mph)", "description": "Speed in miles per hour. Encoded as knots in the packet." },
         "course": { "name": "Course (°)", "description": "Direction of travel in degrees (0–360)." },
         "altitude_ft": { "name": "Altitude (ft)", "description": "Altitude in feet above mean sea level." },
-        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-9 for a mobile station)." }
+        "from_call": { "name": "From callsign", "description": "Override the sending callsign (e.g. KE5YIM-9 for a mobile station)." },
+        "transport": { "name": "Transport", "description": "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy when APRS-IS is connected)." },
+        "nogate": { "name": "NOGATE", "description": "Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both." }
       }
     }
   }

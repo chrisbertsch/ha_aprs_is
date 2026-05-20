@@ -15,16 +15,22 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_BEACON_COMMENT,
     CONF_BEACON_INTERVAL,
+    CONF_BEACON_SYMBOL,
+    CONF_BEACON_TRANSPORT,
+    CONF_WX_BEACON_TRANSPORT,
     CONF_CALLSIGN,
     CONF_EVENT_RATE_LIMIT,
-    CONF_FILTER_EXTRA,
     CONF_HOST,
+    CONF_KISS_HOST,
+    CONF_KISS_PORT,
+    CONF_KISS_RF_PATH,
     CONF_PASSCODE,
     CONF_PORT,
     CONF_POSITION_TYPE,
-    CONF_RANGE_FILTER_RADIUS,
     CONF_STATIONS,
+    CONF_TX_PRIMARY,
     CONF_WEATHER_STATIONS,
     CONF_WX_BEACON_COMMENT,
     CONF_WX_BEACON_FROM_CALL,
@@ -43,11 +49,15 @@ from .const import (
     CONF_WX_ENT_WIND_SPEED,
     CONF_WX_STALENESS_ENTITY,
     CONF_WX_STALENESS_MAX_AGE,
+    DEFAULT_BEACON_COMMENT,
     DEFAULT_BEACON_INTERVAL,
+    DEFAULT_BEACON_SYMBOL,
     DEFAULT_EVENT_RATE_LIMIT,
     DEFAULT_HOST,
+    DEFAULT_KISS_PORT,
+    DEFAULT_KISS_RF_PATH,
     DEFAULT_PORT,
-    DEFAULT_RANGE_FILTER_RADIUS,
+    DEFAULT_TX_PRIMARY,
     DEFAULT_WX_BEACON_INTERVAL,
     DEFAULT_WX_STALENESS_MAX_AGE,
     DOMAIN,
@@ -55,6 +65,10 @@ from .const import (
     POSITION_TYPE_GEO_LOCATION,
     POSITION_TYPE_NONE,
     RECEIVE_ONLY_PASSCODE,
+    TRANSPORT_AUTO,
+    TRANSPORT_BOTH,
+    TX_PRIMARY_APRS_IS,
+    TX_PRIMARY_KISS,
 )
 
 _WX_ENTITY_KEYS = (
@@ -111,8 +125,6 @@ class AprsIsConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_CALLSIGN: callsign,
                         CONF_PASSCODE: int(user_input[CONF_PASSCODE]),
-                        CONF_HOST: user_input.get(CONF_HOST, DEFAULT_HOST),
-                        CONF_PORT: int(user_input.get(CONF_PORT, DEFAULT_PORT)),
                     },
                 )
 
@@ -128,14 +140,6 @@ class AprsIsConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
                             min=-1, max=99999, mode=selector.NumberSelectorMode.BOX
-                        )
-                    ),
-                    vol.Optional(CONF_HOST, default=DEFAULT_HOST): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_PORT, default=DEFAULT_PORT
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
                         )
                     ),
                 }
@@ -166,8 +170,6 @@ class AprsIsConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_CALLSIGN: callsign,
                         CONF_PASSCODE: int(user_input[CONF_PASSCODE]),
-                        CONF_HOST: user_input.get(CONF_HOST, DEFAULT_HOST),
-                        CONF_PORT: int(user_input.get(CONF_PORT, DEFAULT_PORT)),
                     },
                 )
 
@@ -187,16 +189,6 @@ class AprsIsConfigFlow(ConfigFlow, domain=DOMAIN):
                             min=-1, max=99999, mode=selector.NumberSelectorMode.BOX
                         )
                     ),
-                    vol.Optional(
-                        CONF_HOST, default=current.get(CONF_HOST, DEFAULT_HOST)
-                    ): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_PORT, default=current.get(CONF_PORT, DEFAULT_PORT)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
-                        )
-                    ),
                 }
             ),
             errors=errors,
@@ -213,7 +205,7 @@ class AprsIsConfigFlow(ConfigFlow, domain=DOMAIN):
 # ---------------------------------------------------------------------------
 
 class AprsIsOptionsFlow(OptionsFlow):
-    """Multi-step options flow for managing callsigns and globals."""
+    """Multi-step options flow."""
 
     # ------------------------------------------------------------------
     # Top-level menu
@@ -224,69 +216,172 @@ class AprsIsOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["global", "stations", "weather_stations", "wx_beacon"],
+            menu_options=["aprs_is", "kiss_tnc", "station_beacon", "wx_beacon", "stations", "weather_stations"],
         )
 
     # ------------------------------------------------------------------
-    # Global settings
+    # APRS-IS settings
     # ------------------------------------------------------------------
 
-    async def async_step_global(
+    async def async_step_aprs_is(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(
-                data={**self.config_entry.options, **user_input}
-            )
+            host = user_input.get(CONF_HOST, "").strip()
+            updated = {
+                **self.config_entry.options,
+                CONF_HOST: host,
+                CONF_PORT: int(user_input.get(CONF_PORT, DEFAULT_PORT)),
+                CONF_EVENT_RATE_LIMIT: int(user_input.get(CONF_EVENT_RATE_LIMIT, DEFAULT_EVENT_RATE_LIMIT)),
+            }
+            return self.async_create_entry(data=updated)
 
         current = self.config_entry.options
         return self.async_show_form(
-            step_id="global",
+            step_id="aprs_is",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        CONF_RANGE_FILTER_RADIUS,
-                        default=current.get(
-                            CONF_RANGE_FILTER_RADIUS, DEFAULT_RANGE_FILTER_RADIUS
-                        ),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=99999,
-                            unit_of_measurement="km",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_FILTER_EXTRA,
-                        default=current.get(CONF_FILTER_EXTRA, ""),
+                        CONF_HOST,
+                        default=current.get(CONF_HOST, DEFAULT_HOST),
                     ): selector.TextSelector(
                         selector.TextSelectorConfig(autocomplete="off")
                     ),
                     vol.Optional(
-                        CONF_EVENT_RATE_LIMIT,
-                        default=current.get(
-                            CONF_EVENT_RATE_LIMIT, DEFAULT_EVENT_RATE_LIMIT
-                        ),
+                        CONF_PORT,
+                        default=current.get(CONF_PORT, DEFAULT_PORT),
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=0,
-                            max=100,
-                            unit_of_measurement="packets/sec",
+                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_EVENT_RATE_LIMIT,
+                        default=current.get(CONF_EVENT_RATE_LIMIT, DEFAULT_EVENT_RATE_LIMIT),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=100, unit_of_measurement="packets/sec",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # KISS TNC settings
+    # ------------------------------------------------------------------
+
+    async def async_step_kiss_tnc(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            host = user_input.get(CONF_KISS_HOST, "").strip()
+            updated = {
+                **self.config_entry.options,
+                CONF_KISS_HOST: host,
+                CONF_KISS_PORT: int(user_input.get(CONF_KISS_PORT, DEFAULT_KISS_PORT)),
+                CONF_KISS_RF_PATH: user_input.get(CONF_KISS_RF_PATH, DEFAULT_KISS_RF_PATH).strip(),
+                CONF_TX_PRIMARY: user_input.get(CONF_TX_PRIMARY, DEFAULT_TX_PRIMARY),
+            }
+            return self.async_create_entry(data=updated)
+
+        current = self.config_entry.options
+        return self.async_show_form(
+            step_id="kiss_tnc",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_KISS_HOST,
+                        default=current.get(CONF_KISS_HOST, ""),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(autocomplete="off")
+                    ),
+                    vol.Optional(
+                        CONF_KISS_PORT,
+                        default=current.get(CONF_KISS_PORT, DEFAULT_KISS_PORT),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_KISS_RF_PATH,
+                        default=current.get(CONF_KISS_RF_PATH, DEFAULT_KISS_RF_PATH),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(autocomplete="off")
+                    ),
+                    vol.Optional(
+                        CONF_TX_PRIMARY,
+                        default=current.get(CONF_TX_PRIMARY, DEFAULT_TX_PRIMARY),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                selector.SelectOptionDict(
+                                    value=TX_PRIMARY_APRS_IS, label="APRS-IS (internet)"
+                                ),
+                                selector.SelectOptionDict(
+                                    value=TX_PRIMARY_KISS, label="KISS TNC (RF)"
+                                ),
+                            ],
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Station Beacon
+    # ------------------------------------------------------------------
+
+    async def async_step_station_beacon(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            updated = {
+                **self.config_entry.options,
+                CONF_BEACON_INTERVAL: int(user_input.get(CONF_BEACON_INTERVAL, DEFAULT_BEACON_INTERVAL)),
+                CONF_BEACON_COMMENT: user_input.get(CONF_BEACON_COMMENT, DEFAULT_BEACON_COMMENT).strip(),
+                CONF_BEACON_SYMBOL: user_input.get(CONF_BEACON_SYMBOL, DEFAULT_BEACON_SYMBOL).strip(),
+                CONF_BEACON_TRANSPORT: user_input.get(CONF_BEACON_TRANSPORT, TRANSPORT_AUTO),
+            }
+            return self.async_create_entry(data=updated)
+
+        current = self.config_entry.options
+        return self.async_show_form(
+            step_id="station_beacon",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_BEACON_INTERVAL,
+                        default=current.get(CONF_BEACON_INTERVAL, DEFAULT_BEACON_INTERVAL),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=1440, unit_of_measurement="min",
                             mode=selector.NumberSelectorMode.BOX,
                         )
                     ),
                     vol.Optional(
-                        CONF_BEACON_INTERVAL,
-                        default=current.get(
-                            CONF_BEACON_INTERVAL, DEFAULT_BEACON_INTERVAL
-                        ),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=1440,
-                            unit_of_measurement="min",
-                            mode=selector.NumberSelectorMode.BOX,
+                        CONF_BEACON_COMMENT,
+                        default=current.get(CONF_BEACON_COMMENT, DEFAULT_BEACON_COMMENT),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(autocomplete="off")
+                    ),
+                    vol.Optional(
+                        CONF_BEACON_SYMBOL,
+                        default=current.get(CONF_BEACON_SYMBOL, DEFAULT_BEACON_SYMBOL),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(autocomplete="off")
+                    ),
+                    vol.Optional(
+                        CONF_BEACON_TRANSPORT,
+                        default=current.get(CONF_BEACON_TRANSPORT, TRANSPORT_AUTO),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[TRANSPORT_AUTO, TRANSPORT_BOTH, TX_PRIMARY_APRS_IS, TX_PRIMARY_KISS],
+                            mode=selector.SelectSelectorMode.LIST,
+                            translation_key="transport",
                         )
                     ),
                 }
@@ -571,6 +666,7 @@ class AprsIsOptionsFlow(OptionsFlow):
                 new_options[CONF_WX_STALENESS_ENTITY] = staleness
             else:
                 new_options.pop(CONF_WX_STALENESS_ENTITY, None)
+            new_options[CONF_WX_BEACON_TRANSPORT] = user_input.get(CONF_WX_BEACON_TRANSPORT, TRANSPORT_AUTO)
             return self.async_create_entry(data=new_options)
 
         current = self.config_entry.options
@@ -640,7 +736,16 @@ class AprsIsOptionsFlow(OptionsFlow):
                             mode=selector.NumberSelectorMode.BOX,
                         )
                     ),
+                    vol.Optional(
+                        CONF_WX_BEACON_TRANSPORT,
+                        default=current.get(CONF_WX_BEACON_TRANSPORT, TRANSPORT_AUTO),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[TRANSPORT_AUTO, TRANSPORT_BOTH, TX_PRIMARY_APRS_IS, TX_PRIMARY_KISS],
+                            mode=selector.SelectSelectorMode.LIST,
+                            translation_key="transport",
+                        )
+                    ),
                 }
             ),
         )
-

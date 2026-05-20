@@ -35,15 +35,22 @@ from homeassistant.util.unit_conversion import (
 from .const import (
     APRS_SOFTWARE_NAME,
     APRS_SOFTWARE_VERSION,
+    APRS_TOCALL,
+    CONF_BEACON_COMMENT,
     CONF_BEACON_INTERVAL,
+    CONF_BEACON_SYMBOL,
+    CONF_BEACON_TRANSPORT,
+    CONF_WX_BEACON_TRANSPORT,
     CONF_CALLSIGN,
     CONF_EVENT_RATE_LIMIT,
-    CONF_FILTER_EXTRA,
     CONF_HOST,
+    CONF_KISS_HOST,
+    CONF_KISS_PORT,
+    CONF_KISS_RF_PATH,
     CONF_PASSCODE,
     CONF_PORT,
-    CONF_RANGE_FILTER_RADIUS,
     CONF_STATIONS,
+    CONF_TX_PRIMARY,
     CONF_WEATHER_STATIONS,
     CONF_WX_BEACON_COMMENT,
     CONF_WX_BEACON_FROM_CALL,
@@ -62,11 +69,15 @@ from .const import (
     CONF_WX_ENT_WIND_SPEED,
     CONF_WX_STALENESS_ENTITY,
     CONF_WX_STALENESS_MAX_AGE,
+    DEFAULT_BEACON_COMMENT,
     DEFAULT_BEACON_INTERVAL,
+    DEFAULT_BEACON_SYMBOL,
     DEFAULT_EVENT_RATE_LIMIT,
     DEFAULT_HOST,
+    DEFAULT_KISS_PORT,
+    DEFAULT_KISS_RF_PATH,
     DEFAULT_PORT,
-    DEFAULT_RANGE_FILTER_RADIUS,
+    DEFAULT_TX_PRIMARY,
     DEFAULT_WX_BEACON_INTERVAL,
     DEFAULT_WX_STALENESS_MAX_AGE,
     DOMAIN,
@@ -83,7 +94,12 @@ from .const import (
     PACKET_TYPE_STATUS,
     PACKET_TYPE_WEATHER,
     RECEIVE_ONLY_PASSCODE,
+    TRANSPORT_AUTO,
+    TRANSPORT_BOTH,
+    TX_PRIMARY_APRS_IS,
+    TX_PRIMARY_KISS,
 )
+from .kiss import encode_ax25_ui, encode_kiss_frame, parse_ax25_frame
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,21 +126,28 @@ class AprsIsCoordinator:
         self.hass = hass
         self.entry = entry
 
-        # TCP handles
+        # APRS-IS TCP handles
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._write_lock = asyncio.Lock()
 
+        # KISS TNC TCP handles
+        self._kiss_reader: asyncio.StreamReader | None = None
+        self._kiss_writer: asyncio.StreamWriter | None = None
+        self._kiss_write_lock = asyncio.Lock()
+
         # Lifecycle
         self._shutdown = False
         self._connected = False
+        self._kiss_connected = False
         self._connect_task: asyncio.Task | None = None
+        self._kiss_connect_task: asyncio.Task | None = None
         self._keepalive_task: asyncio.Task | None = None
         self._beacon_task: asyncio.Task | None = None
         self._wx_beacon_task: asyncio.Task | None = None
         self.connected_at: Any = None
 
-        # Connection-level stats
+        # APRS-IS stats
         self.rx_packets: int = 0
         self.tx_packets: int = 0
         self.tx_messages: int = 0   # user-initiated messages only, not ACKs
@@ -134,6 +157,11 @@ class AprsIsCoordinator:
         self.last_tx_packet: str | None = None
         self.last_beacon_at: datetime | None = None
         self.last_wx_beacon_at: datetime | None = None
+
+        # KISS TNC stats
+        self.kiss_rx_packets: int = 0
+        self.kiss_tx_packets: int = 0
+        self.kiss_tx_messages: int = 0
 
 
         # Rate limiter — sliding 1-second window of event fire timestamps
@@ -173,6 +201,18 @@ class AprsIsCoordinator:
         """Effective sending callsign for the weather beacon."""
         return (self.entry.options.get(CONF_WX_BEACON_FROM_CALL) or self.callsign).upper()
 
+    @property
+    def aprs_is_configured(self) -> bool:
+        return bool(self.entry.options.get(CONF_HOST, DEFAULT_HOST).strip())
+
+    @property
+    def kiss_configured(self) -> bool:
+        return bool(self.entry.options.get(CONF_KISS_HOST, "").strip())
+
+    @property
+    def kiss_connected(self) -> bool:
+        return self._kiss_connected
+
     def is_my_callsign(self, callsign: str) -> bool:
         """True if callsign shares the same base as the login callsign."""
         return self.callsign.upper().split("-")[0] == callsign.upper().split("-")[0]
@@ -183,28 +223,43 @@ class AprsIsCoordinator:
 
     async def async_start(self) -> None:
         self._shutdown = False
-        self._connect_task = self.hass.async_create_background_task(
-            self._connection_loop(),
-            name=f"{DOMAIN}_conn_{self.callsign}",
-        )
-        self._beacon_task = self.hass.async_create_background_task(
-            self._beacon_loop(),
-            name=f"{DOMAIN}_beacon_{self.callsign}",
-        )
-        self._wx_beacon_task = self.hass.async_create_background_task(
-            self._wx_beacon_loop(),
-            name=f"{DOMAIN}_wx_beacon_{self.callsign}",
-        )
+        if self.aprs_is_configured:
+            self._connect_task = self.hass.async_create_background_task(
+                self._connection_loop(),
+                name=f"{DOMAIN}_conn_{self.callsign}",
+            )
+            self._beacon_task = self.hass.async_create_background_task(
+                self._beacon_loop(),
+                name=f"{DOMAIN}_beacon_{self.callsign}",
+            )
+            self._wx_beacon_task = self.hass.async_create_background_task(
+                self._wx_beacon_loop(),
+                name=f"{DOMAIN}_wx_beacon_{self.callsign}",
+            )
+        else:
+            _LOGGER.info("APRS-IS: host not configured — APRS-IS connection disabled")
+        if self.kiss_configured:
+            self._kiss_connect_task = self.hass.async_create_background_task(
+                self._kiss_connection_loop(),
+                name=f"{DOMAIN}_kiss_{self.callsign}",
+            )
 
     async def async_stop(self) -> None:
         self._shutdown = True
-        for task in (self._keepalive_task, self._connect_task, self._beacon_task, self._wx_beacon_task):
+        for task in (
+            self._keepalive_task,
+            self._connect_task,
+            self._beacon_task,
+            self._wx_beacon_task,
+            self._kiss_connect_task,
+        ):
             if task:
                 task.cancel()
         for task in self._pending_messages.values():
             task.cancel()
         self._pending_messages.clear()
         await self._close_connection()
+        await self._close_kiss_connection()
 
     async def async_reconnect(self) -> None:
         """Cancel the current connection and immediately start a new one.
@@ -248,6 +303,18 @@ class AprsIsCoordinator:
             self._wx_beacon_loop(),
             name=f"{DOMAIN}_wx_beacon_{self.callsign}",
         )
+        if self._kiss_connect_task:
+            self._kiss_connect_task.cancel()
+            try:
+                await self._kiss_connect_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        await self._close_kiss_connection()
+        if self.kiss_configured:
+            self._kiss_connect_task = self.hass.async_create_background_task(
+                self._kiss_connection_loop(),
+                name=f"{DOMAIN}_kiss_{self.callsign}",
+            )
 
     def register_callback(self, cb: Callable[[dict], None]) -> Callable[[], None]:
         """Register for packet/state updates. Returns an unregister callable."""
@@ -264,7 +331,8 @@ class AprsIsCoordinator:
     # ------------------------------------------------------------------
 
     async def async_send_message(
-        self, to: str, message: str, from_call: str | None = None
+        self, to: str, message: str, from_call: str | None = None,
+        transport: str = TRANSPORT_AUTO, nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         to_padded = to.upper().ljust(9)
@@ -273,32 +341,34 @@ class AprsIsCoordinator:
         # means ACKs go to a callsign we don't receive messages for.
         if sender == self.callsign.upper():
             msgid = self._next_msg_id()
-            packet = f"{sender}>APRS,TCPIP*::{to_padded}:{message[:67]}{{{msgid}"
-            await self._send(packet, sender=sender, is_message=True)
+            packet = f"{sender}>{APRS_TOCALL},TCPIP*::{to_padded}:{message[:67]}{{{msgid}"
+            await self._send(packet, sender=sender, is_message=True, transport=transport, nogate=nogate)
             key = (sender, msgid)
             self._pending_messages[key] = self.hass.async_create_background_task(
-                self._message_retry_loop(packet, sender, msgid),
+                self._message_retry_loop(packet, sender, msgid, transport=transport, nogate=nogate),
                 name=f"{DOMAIN}_retry_{msgid}",
             )
         else:
-            packet = f"{sender}>APRS,TCPIP*::{to_padded}:{message[:67]}"
-            await self._send(packet, sender=sender, is_message=True)
+            packet = f"{sender}>{APRS_TOCALL},TCPIP*::{to_padded}:{message[:67]}"
+            await self._send(packet, sender=sender, is_message=True, transport=transport, nogate=nogate)
 
     async def async_send_bulletin(
-        self, bulletin_id: str, message: str, from_call: str | None = None
+        self, bulletin_id: str, message: str, from_call: str | None = None,
+        transport: str = TRANSPORT_AUTO, nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         bln_name = f"BLN{str(bulletin_id).upper()}"[:9].ljust(9)
-        packet = f"{sender}>APRS,TCPIP*::{bln_name}:{message[:67]}"
-        await self._send(packet, sender=sender)
+        packet = f"{sender}>{APRS_TOCALL},TCPIP*::{bln_name}:{message[:67]}"
+        await self._send(packet, sender=sender, transport=transport, nogate=nogate)
 
     async def async_send_announcement(
-        self, announcement_id: str, message: str, from_call: str | None = None
+        self, announcement_id: str, message: str, from_call: str | None = None,
+        transport: str = TRANSPORT_AUTO, nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         ann_name = f"BLN{announcement_id.upper()[0]}"[:9].ljust(9)
-        packet = f"{sender}>APRS,TCPIP*::{ann_name}:{message[:67]}"
-        await self._send(packet, sender=sender)
+        packet = f"{sender}>{APRS_TOCALL},TCPIP*::{ann_name}:{message[:67]}"
+        await self._send(packet, sender=sender, transport=transport, nogate=nogate)
 
     async def async_send_wx_report(
         self,
@@ -307,6 +377,8 @@ class AprsIsCoordinator:
         latitude: float | None = None,
         longitude: float | None = None,
         comment: str = "",
+        transport: str = TRANSPORT_AUTO,
+        nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         packet = _build_wx_packet(
@@ -314,7 +386,7 @@ class AprsIsCoordinator:
             lat_override=latitude, lon_override=longitude, comment=comment,
         )
         if packet:
-            await self._send(packet, sender=sender)
+            await self._send(packet, sender=sender, transport=transport, nogate=nogate)
 
     async def async_send_object(
         self,
@@ -326,12 +398,14 @@ class AprsIsCoordinator:
         comment: str = "",
         from_call: str | None = None,
         killed: bool = False,
+        transport: str = TRANSPORT_AUTO,
+        nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         packet = _build_object_packet(
             sender, object_name, lat, lon, symbol_table, symbol_code, comment, killed
         )
-        await self._send(packet, sender=sender)
+        await self._send(packet, sender=sender, transport=transport, nogate=nogate)
 
     async def async_send_position(
         self,
@@ -344,6 +418,8 @@ class AprsIsCoordinator:
         course: int | None = None,
         altitude_ft: int | None = None,
         from_call: str | None = None,
+        transport: str = TRANSPORT_AUTO,
+        nogate: bool = False,
     ) -> None:
         sender = (from_call or self.callsign).upper()
         data_ext = ""
@@ -357,18 +433,25 @@ class AprsIsCoordinator:
             f"{_lon_to_aprs(lon)}{symbol_code}"
             f"{data_ext}{alt_str}{comment}"
         )
-        packet = f"{sender}>APRS,TCPIP*:{info}"
-        await self._send(packet, sender=sender)
+        packet = f"{sender}>{APRS_TOCALL},TCPIP*:{info}"
+        await self._send(packet, sender=sender, transport=transport, nogate=nogate)
 
     async def _send_beacon(self) -> None:
         """Send one position beacon for the login callsign using HA home coordinates."""
+        opts = self.entry.options
+        symbol = opts.get(CONF_BEACON_SYMBOL, DEFAULT_BEACON_SYMBOL)
+        symbol_table = symbol[0] if len(symbol) >= 1 else "/"
+        symbol_code = symbol[1] if len(symbol) >= 2 else "-"
+        comment = opts.get(CONF_BEACON_COMMENT, DEFAULT_BEACON_COMMENT)
+        transport = opts.get(CONF_BEACON_TRANSPORT, TRANSPORT_AUTO)
         try:
             await self.async_send_position(
                 lat=self.hass.config.latitude,
                 lon=self.hass.config.longitude,
-                symbol_table="/",
-                symbol_code="-",
-                comment="Home Assistant",
+                symbol_table=symbol_table,
+                symbol_code=symbol_code,
+                comment=comment,
+                transport=transport,
             )
             self.last_beacon_at = dt_util.utcnow()
             self._notify_callbacks({"type": "beacon_sent"})
@@ -406,9 +489,10 @@ class AprsIsCoordinator:
     async def _send_wx_beacon(self) -> None:
         opts = self.entry.options
         staleness_entity = opts.get(CONF_WX_STALENESS_ENTITY)
-        max_age_min = int(opts.get(CONF_WX_STALENESS_MAX_AGE, DEFAULT_WX_STALENESS_MAX_AGE))
 
         if staleness_entity:
+            # Explicit staleness entity takes precedence (e.g. an uptime sensor).
+            max_age_min = int(opts.get(CONF_WX_STALENESS_MAX_AGE, DEFAULT_WX_STALENESS_MAX_AGE))
             state = self.hass.states.get(staleness_entity)
             if state is None or state.state in ("unavailable", "unknown"):
                 _LOGGER.warning(
@@ -422,6 +506,33 @@ class AprsIsCoordinator:
                     staleness_entity, age_min, max_age_min,
                 )
                 return
+        else:
+            # Default: at least one configured WX entity must have updated within whichever is
+            # longer — the beacon interval or the configured max data age.
+            interval_sec = int(opts.get(CONF_WX_BEACON_INTERVAL, DEFAULT_WX_BEACON_INTERVAL)) * 60
+            max_age_sec = int(opts.get(CONF_WX_STALENESS_MAX_AGE, DEFAULT_WX_STALENESS_MAX_AGE)) * 60
+            threshold_sec = max(interval_sec, max_age_sec)
+            _WX_ENT_KEYS = (
+                CONF_WX_ENT_TEMP, CONF_WX_ENT_HUMIDITY, CONF_WX_ENT_PRESSURE,
+                CONF_WX_ENT_WIND_SPEED, CONF_WX_ENT_WIND_DIR, CONF_WX_ENT_WIND_GUST,
+                CONF_WX_ENT_RAIN_1H, CONF_WX_ENT_RAIN_24H, CONF_WX_ENT_RAIN_MIDNIGHT,
+                CONF_WX_ENT_LUMINOSITY,
+            )
+            configured = [eid for k in _WX_ENT_KEYS if (eid := opts.get(k))]
+            if configured:
+                now = dt_util.utcnow()
+                fresh = False
+                for eid in configured:
+                    s = self.hass.states.get(eid)
+                    if s is not None and (now - s.last_updated).total_seconds() <= threshold_sec:
+                        fresh = True
+                        break
+                if not fresh:
+                    _LOGGER.warning(
+                        "APRS WX beacon: no configured entity updated in the last %d min — skipping",
+                        threshold_sec // 60,
+                    )
+                    return
 
         data = _wx_data_from_entity_options(self.hass, opts)
         if not data:
@@ -432,10 +543,12 @@ class AprsIsCoordinator:
         comment = opts.get(CONF_WX_BEACON_COMMENT, "Home Assistant")
         latitude = opts.get(CONF_WX_BEACON_LATITUDE)
         longitude = opts.get(CONF_WX_BEACON_LONGITUDE)
+        transport = opts.get(CONF_WX_BEACON_TRANSPORT, TRANSPORT_AUTO)
         try:
             await self.async_send_wx_report(
                 data=data, from_call=from_call, comment=comment,
                 latitude=latitude, longitude=longitude,
+                transport=transport,
             )
             self.tx_wx_beacon_packets += 1
             self.last_wx_beacon_at = dt_util.utcnow()
@@ -469,9 +582,18 @@ class AprsIsCoordinator:
             if self._connected:
                 await self._send_wx_beacon()
 
-    async def _message_retry_loop(self, packet: str, sender: str, msgid: str) -> None:
+    async def _message_retry_loop(
+        self, packet: str, sender: str, msgid: str,
+        transport: str = TRANSPORT_AUTO, nogate: bool = False,
+    ) -> None:
         """Retry an outbound message until ACK received or retries exhausted."""
         key = (sender.upper(), msgid)
+        if transport == TRANSPORT_AUTO:
+            order = self._tx_order()
+        elif transport == TX_PRIMARY_KISS:
+            order = [TX_PRIMARY_KISS]
+        else:
+            order = [TX_PRIMARY_APRS_IS]
         for delay in _MSG_RETRY_DELAYS:
             try:
                 await asyncio.sleep(delay)
@@ -479,12 +601,25 @@ class AprsIsCoordinator:
                 return
             if key not in self._pending_messages:
                 return  # ACK was received
-            if self._connected and self._writer is not None:
-                try:
-                    await self._raw_write(packet)
-                    _LOGGER.debug("APRS message retry (msgid=%s)", msgid)
-                except Exception as exc:
-                    _LOGGER.debug("APRS message retry failed (msgid=%s): %s", msgid, exc)
+            for t in order:
+                if t == TX_PRIMARY_APRS_IS:
+                    if int(self.entry.data[CONF_PASSCODE]) == RECEIVE_ONLY_PASSCODE:
+                        continue
+                    if self._connected and self._writer is not None:
+                        try:
+                            await self._raw_write(packet)
+                            _LOGGER.debug("APRS-IS message retry (msgid=%s)", msgid)
+                        except Exception as exc:
+                            _LOGGER.debug("APRS-IS message retry failed (msgid=%s): %s", msgid, exc)
+                        break
+                elif t == TX_PRIMARY_KISS:
+                    if self.kiss_configured and self._kiss_connected:
+                        try:
+                            await self._kiss_write_packet(packet, nogate=nogate)
+                            _LOGGER.debug("KISS TNC message retry (msgid=%s)", msgid)
+                        except Exception as exc:
+                            _LOGGER.debug("KISS TNC message retry failed (msgid=%s): %s", msgid, exc)
+                        break
         self._pending_messages.pop(key, None)
         _LOGGER.debug("APRS message %s no ACK after %d retries — giving up", msgid, len(_MSG_RETRY_DELAYS))
 
@@ -524,8 +659,8 @@ class AprsIsCoordinator:
             backoff = min(backoff * 2, _RECONNECT_MAX)
 
     async def _connect_and_listen(self) -> None:
-        host = self.entry.data.get(CONF_HOST, DEFAULT_HOST)
-        port = int(self.entry.data.get(CONF_PORT, DEFAULT_PORT))
+        host = self.entry.options.get(CONF_HOST, DEFAULT_HOST)
+        port = int(self.entry.options.get(CONF_PORT, DEFAULT_PORT))
         passcode = int(self.entry.data[CONF_PASSCODE])
 
         _LOGGER.info("APRS-IS: connecting to %s:%d as %s", host, port, self.callsign)
@@ -613,30 +748,174 @@ class AprsIsCoordinator:
             self._reader = None
 
     # ------------------------------------------------------------------
+    # KISS TNC connection loop
+    # ------------------------------------------------------------------
+
+    async def _kiss_connection_loop(self) -> None:
+        backoff = 5
+        while not self._shutdown:
+            try:
+                await self._kiss_connect_and_listen()
+                backoff = 5
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                _LOGGER.error("KISS TNC connection error: %s", exc)
+
+            if self._shutdown:
+                return
+
+            self._kiss_connected = False
+            self._notify_callbacks({"type": "kiss_connection_status"})
+            _LOGGER.info("KISS TNC: reconnecting in %ds", backoff)
+            try:
+                await asyncio.sleep(backoff)
+            except asyncio.CancelledError:
+                return
+            backoff = min(backoff * 2, _RECONNECT_MAX)
+
+    async def _kiss_connect_and_listen(self) -> None:
+        host = self.entry.options.get(CONF_KISS_HOST, "").strip()
+        port = int(self.entry.options.get(CONF_KISS_PORT, DEFAULT_KISS_PORT))
+
+        _LOGGER.info("KISS TNC: connecting to %s:%d", host, port)
+        self._kiss_reader, self._kiss_writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=_CONNECT_TIMEOUT
+        )
+        self._kiss_connected = True
+        self._notify_callbacks({"type": "kiss_connection_status"})
+        _LOGGER.info("KISS TNC: connected to %s:%d", host, port)
+
+        buf = bytearray()
+        in_frame = False
+        while not self._shutdown:
+            try:
+                chunk = await asyncio.wait_for(
+                    self._kiss_reader.read(1024), timeout=_READLINE_TIMEOUT
+                )
+            except TimeoutError:
+                continue
+
+            if not chunk:
+                _LOGGER.warning("KISS TNC: connection closed by remote")
+                break
+
+            for b in chunk:
+                if b == 0xC0:  # FEND
+                    if in_frame and buf:
+                        await self._handle_kiss_frame(bytes(buf))
+                    buf.clear()
+                    in_frame = True
+                elif in_frame:
+                    buf.append(b)
+
+    async def _handle_kiss_frame(self, raw: bytes) -> None:
+        """Decode a raw KISS frame (between FENDs) and dispatch to _handle_kiss_line."""
+        if not raw or (raw[0] & 0x0F) != 0:
+            return  # not a data frame
+
+        # Unescape: skip type byte at index 0
+        data = bytearray()
+        i = 1
+        while i < len(raw):
+            if raw[i] == 0xDB and i + 1 < len(raw):
+                if raw[i + 1] == 0xDC:
+                    data.append(0xC0)
+                elif raw[i + 1] == 0xDD:
+                    data.append(0xDB)
+                else:
+                    data.append(raw[i + 1])
+                i += 2
+            else:
+                data.append(raw[i])
+                i += 1
+
+        frame = parse_ax25_frame(bytes(data))
+        if frame is None:
+            return
+
+        info_str = frame["info"].decode("utf-8", errors="replace")
+        path = ",".join(frame["digipeaters"]) if frame["digipeaters"] else frame["destination"]
+        line = f"{frame['source']}>{frame['destination']},{path}:{info_str}" if frame["digipeaters"] else f"{frame['source']}>{frame['destination']}:{info_str}"
+        await self._handle_kiss_line(line)
+
+    async def _close_kiss_connection(self) -> None:
+        self._kiss_connected = False
+        if self._kiss_writer:
+            try:
+                self._kiss_writer.close()
+                await self._kiss_writer.wait_closed()
+            except Exception:
+                pass
+            self._kiss_writer = None
+            self._kiss_reader = None
+
+    # ------------------------------------------------------------------
     # Inbound packet handling
     # ------------------------------------------------------------------
 
     async def _handle_line(self, line: str) -> None:
+        """APRS-IS inbound: skip server comments, count, parse, dispatch."""
         if line.startswith("#"):
             _LOGGER.debug("APRS-IS server msg: %s", line)
             return
 
         self.rx_packets += 1
+        _LOGGER.debug("APRS-IS RX: %s", line)
 
         try:
             packet = aprslib.parse(line)
         except (ParseError, UnknownFormat) as exc:
-            _LOGGER.debug("APRS parse skip (%s): %s", exc, line[:80])
+            _LOGGER.debug("APRS-IS parse skip (%s): %s", exc, line[:80])
             return
         except Exception as exc:
-            _LOGGER.debug("APRS parse error (%s): %s", exc, line[:80])
+            _LOGGER.debug("APRS-IS parse error (%s): %s", exc, line[:80])
             return
 
         packet["raw"] = line
         packet["_type"] = _classify_packet(packet)
         self.last_rx_packet = packet
+        _LOGGER.debug("APRS-IS RX [%s] from=%s", packet["_type"], packet.get("from", "?"))
+        await self._process_packet(packet, line)
+
+    async def _handle_kiss_line(self, line: str) -> None:
+        """KISS TNC inbound: count, parse, apply local station filter, dispatch."""
+        self.kiss_rx_packets += 1
+        _LOGGER.debug("KISS TNC RX: %s", line)
+
+        try:
+            packet = aprslib.parse(line)
+        except (ParseError, UnknownFormat) as exc:
+            _LOGGER.debug("KISS parse skip (%s): %s", exc, line[:80])
+            return
+        except Exception as exc:
+            _LOGGER.debug("KISS parse error (%s): %s", exc, line[:80])
+            return
+
+        packet["raw"] = line
+        packet["_type"] = _classify_packet(packet)
+        self.last_rx_packet = packet
+        _LOGGER.debug("KISS RX [%s] from=%s", packet["_type"], packet.get("from", "?"))
+
+        self._notify_callbacks({"type": "kiss_rx_update"})
+
+        # Local filter: mirrors APRS-IS server filter (b/ and g/)
+        source = packet.get("from", "").upper()
+        opts = self.entry.options
+        configured: set[str] = {s["callsign"].upper() for s in opts.get(CONF_STATIONS, [])}
+        configured |= {wx["callsign"].upper() for wx in opts.get(CONF_WEATHER_STATIONS, [])}
+        is_addressed_to_us = (
+            packet["_type"] == PACKET_TYPE_MESSAGE
+            and packet.get("addresse", "").strip().upper() == self.callsign.upper()
+        )
+        if source not in configured and not is_addressed_to_us:
+            return
+
+        await self._process_packet(packet, line)
+
+    async def _process_packet(self, packet: dict, raw_line: str) -> None:
+        """Shared dispatch — called from both _handle_line and _handle_kiss_line."""
         ptype: str = packet["_type"]
-        _LOGGER.debug("APRS RX [%s] from=%s: %s", ptype, packet.get("from", "?"), line)
 
         if ptype == PACKET_TYPE_MESSAGE:
             await self._handle_incoming_message(packet)
@@ -646,7 +925,7 @@ class AprsIsCoordinator:
         if self._check_rate_limit():
             event_data: dict[str, Any] = {
                 "entry_id": self.entry.entry_id,
-                "raw": line,
+                "raw": raw_line,
                 "from": packet.get("from", ""),
                 "type": ptype,
                 "parsed": dict(packet),
@@ -693,32 +972,105 @@ class AprsIsCoordinator:
         )
 
     async def _send_ack(self, from_ssid: str, to_call: str, msgid: str) -> None:
-        """Send APRS message ACK. Does not count toward tx stats."""
+        """Send APRS message ACK via best available transport. Does not count toward tx stats."""
         to_padded = to_call.ljust(9)
-        await self._raw_write(f"{from_ssid}>APRS,TCPIP*::{to_padded}:ack{msgid}")
+        packet = f"{from_ssid}>{APRS_TOCALL},TCPIP*::{to_padded}:ack{msgid}"
+        for transport in self._tx_order():
+            if transport == TX_PRIMARY_APRS_IS:
+                if int(self.entry.data[CONF_PASSCODE]) == RECEIVE_ONLY_PASSCODE:
+                    continue
+                if self._connected and self._writer is not None:
+                    try:
+                        await self._raw_write(packet)
+                    except Exception as exc:
+                        _LOGGER.debug("ACK send via APRS-IS failed: %s", exc)
+                    return
+            elif transport == TX_PRIMARY_KISS:
+                if self.kiss_configured and self._kiss_connected:
+                    try:
+                        await self._kiss_write_packet(packet)
+                    except Exception as exc:
+                        _LOGGER.debug("ACK send via KISS failed: %s", exc)
+                    return
 
     # ------------------------------------------------------------------
     # Outbound send
     # ------------------------------------------------------------------
 
+    def _tx_order(self) -> list[str]:
+        """Return transports in preferred transmit order."""
+        pref = self.entry.options.get(CONF_TX_PRIMARY, DEFAULT_TX_PRIMARY)
+        if pref == TX_PRIMARY_KISS:
+            return [TX_PRIMARY_KISS, TX_PRIMARY_APRS_IS]
+        return [TX_PRIMARY_APRS_IS, TX_PRIMARY_KISS]
+
     async def _send(
-        self, packet: str, sender: str | None = None, is_message: bool = False
+        self, packet: str, sender: str | None = None, is_message: bool = False,
+        transport: str = TRANSPORT_AUTO, nogate: bool = False,
     ) -> None:
-        if not self._connected or self._writer is None:
-            raise RuntimeError("Not connected to APRS-IS")
-        if int(self.entry.data[CONF_PASSCODE]) == RECEIVE_ONLY_PASSCODE:
-            raise RuntimeError(
-                "Integration is in receive-only mode (passcode -1) — cannot send"
-            )
+        if transport == TRANSPORT_BOTH:
+            # Send on both transports; NOGATE is always forced on the RF copy to
+            # prevent IGates re-injecting the packet back onto APRS-IS.
+            sent = False
+            if int(self.entry.data[CONF_PASSCODE]) != RECEIVE_ONLY_PASSCODE:
+                if self._connected and self._writer is not None:
+                    await self._raw_write(packet)
+                    self.tx_packets += 1
+                    if sender and is_message:
+                        self.tx_messages += 1
+                    self._notify_callbacks({"type": "tx_update", "packet": packet})
+                    sent = True
+            if self.kiss_configured and self._kiss_connected:
+                # Force NOGATE only when APRS-IS is up; if it's disconnected,
+                # let IGates pick up the RF copy and inject it onto APRS-IS.
+                aprs_is_up = (
+                    self._connected
+                    and self._writer is not None
+                    and int(self.entry.data[CONF_PASSCODE]) != RECEIVE_ONLY_PASSCODE
+                )
+                await self._kiss_write_packet(packet, nogate=aprs_is_up or nogate)
+                self.kiss_tx_packets += 1
+                if sender and is_message:
+                    self.kiss_tx_messages += 1
+                self._notify_callbacks({"type": "kiss_tx_update", "packet": packet})
+                sent = True
+            if not sent:
+                raise RuntimeError("Not connected to APRS-IS or KISS TNC")
+        else:
+            if transport == TRANSPORT_AUTO:
+                order = self._tx_order()
+            elif transport == TX_PRIMARY_KISS:
+                order = [TX_PRIMARY_KISS]
+            else:
+                order = [TX_PRIMARY_APRS_IS]
 
-        await self._raw_write(packet)
-        self.tx_packets += 1
+            sent = False
+            for t in order:
+                if t == TX_PRIMARY_APRS_IS:
+                    if int(self.entry.data[CONF_PASSCODE]) == RECEIVE_ONLY_PASSCODE:
+                        continue
+                    if self._connected and self._writer is not None:
+                        await self._raw_write(packet)
+                        self.tx_packets += 1
+                        if sender and is_message:
+                            self.tx_messages += 1
+                        self._notify_callbacks({"type": "tx_update", "packet": packet})
+                        sent = True
+                        break
+                elif t == TX_PRIMARY_KISS:
+                    if self.kiss_configured and self._kiss_connected:
+                        await self._kiss_write_packet(packet, nogate=nogate)
+                        self.kiss_tx_packets += 1
+                        if sender and is_message:
+                            self.kiss_tx_messages += 1
+                        self._notify_callbacks({"type": "kiss_tx_update", "packet": packet})
+                        sent = True
+                        break
 
-        if sender and is_message:
-            self.tx_messages += 1
+            if not sent:
+                raise RuntimeError("Not connected to APRS-IS or KISS TNC")
 
         self.last_tx_packet = packet
-        self._notify_callbacks({"type": "tx_update", "packet": packet})
         self.hass.bus.async_fire(
             EVENT_PACKET_SENT,
             {
@@ -730,9 +1082,30 @@ class AprsIsCoordinator:
 
     async def _raw_write(self, line: str) -> None:
         async with self._write_lock:
-            _LOGGER.debug("APRS TX: %s", line)
+            _LOGGER.debug("APRS-IS TX: %s", line)
             self._writer.write(f"{line}\r\n".encode())
             await self._writer.drain()
+
+    async def _kiss_write_packet(self, packet_str: str, nogate: bool = False) -> None:
+        """Encode an APRS-IS format packet string as AX.25/KISS and transmit."""
+        gt = packet_str.index(">")
+        colon = packet_str.index(":", gt)
+        source = packet_str[:gt]
+        info = packet_str[colon + 1:].encode("utf-8", errors="replace")
+        rf_path = self.entry.options.get(CONF_KISS_RF_PATH, DEFAULT_KISS_RF_PATH)
+        digipeaters = [d.strip() for d in rf_path.split(",") if d.strip()]
+        if nogate:
+            digipeaters.append("NOGATE")
+        ax25 = encode_ax25_ui(source, APRS_TOCALL, digipeaters, info)
+        frame = encode_kiss_frame(ax25)
+        await self._kiss_raw_write(frame)
+        path = ",".join(digipeaters)
+        _LOGGER.debug("KISS TX: %s>%s,%s:%s", source, APRS_TOCALL, path, info.decode("utf-8", errors="replace"))
+
+    async def _kiss_raw_write(self, frame: bytes) -> None:
+        async with self._kiss_write_lock:
+            self._kiss_writer.write(frame)
+            await self._kiss_writer.drain()
 
     # ------------------------------------------------------------------
     # Filter builder
@@ -753,18 +1126,6 @@ class AprsIsCoordinator:
 
         # g/ — messages addressed TO our login callsign only
         parts.append(f"g/{self.callsign.upper()}")
-
-        # r/ — range filter centred on HA's configured home location
-        radius = int(options.get(CONF_RANGE_FILTER_RADIUS, DEFAULT_RANGE_FILTER_RADIUS))
-        if radius > 0:
-            lat = self.hass.config.latitude
-            lon = self.hass.config.longitude
-            parts.append(f"r/{lat:.4f}/{lon:.4f}/{radius}")
-
-        # User-supplied extra terms appended verbatim
-        extra = options.get(CONF_FILTER_EXTRA, "").strip()
-        if extra:
-            parts.append(extra)
 
         if not parts:
             return ""
@@ -996,7 +1357,7 @@ def _build_wx_packet(
         f"{lum_str}"
         f"{comment}"
     )
-    return f"{sender}>APRS,TCPIP*:{body}"
+    return f"{sender}>{APRS_TOCALL},TCPIP*:{body}"
 
 
 def _build_object_packet(
@@ -1015,7 +1376,7 @@ def _build_object_packet(
     obj_name = name[:9].ljust(9)
     alive = "_" if killed else "*"
     return (
-        f"{sender}>APRS,TCPIP*:"
+        f"{sender}>{APRS_TOCALL},TCPIP*:"
         f";{obj_name}{alive}{ts}"
         f"{_lat_to_aprs(lat)}{symbol_table}"
         f"{_lon_to_aprs(lon)}{symbol_code}"

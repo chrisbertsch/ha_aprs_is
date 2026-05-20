@@ -44,3 +44,19 @@ jobs:
 
       - name: Run ruff
         run: ruff check custom_components/
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install test dependencies
+        run: pip install pytest==9.0.3 pytest-asyncio==1.3.0 pytest-homeassistant-custom-component==0.13.331 aprslib==0.7.2
+
+      - name: Run tests
+        run: python -m pytest tests/ -v

@@ -10,7 +10,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .const import (
+    CONF_NOGATE,
     CONF_STATIONS,
+    CONF_TRANSPORT,
     CONF_WEATHER_STATIONS,
     CONF_WX_ENT_HUMIDITY,
     CONF_WX_ENT_LUMINOSITY,
@@ -31,6 +33,10 @@ from .const import (
     SERVICE_SEND_POSITION,
     SERVICE_SEND_WX_FROM_ENTITIES,
     SERVICE_SEND_WX_REPORT,
+    TRANSPORT_AUTO,
+    TRANSPORT_BOTH,
+    TX_PRIMARY_APRS_IS,
+    TX_PRIMARY_KISS,
 )
 from .coordinator import AprsIsCoordinator, _wx_data_from_entity_options
 
@@ -38,12 +44,23 @@ type AprsIsConfigEntry = ConfigEntry[AprsIsCoordinator]
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.DEVICE_TRACKER, Platform.GEO_LOCATION, Platform.WEATHER]
 
+# Validator for services that support all four transport modes.
+_TRANSPORT_WITH_BOTH = vol.In(
+    [TRANSPORT_AUTO, TRANSPORT_BOTH, TX_PRIMARY_APRS_IS, TX_PRIMARY_KISS]
+)
+# send_message omits TRANSPORT_BOTH — duplicate msgid delivery on RF is unreliable.
+_TRANSPORT_NO_BOTH = vol.In(
+    [TRANSPORT_AUTO, TX_PRIMARY_APRS_IS, TX_PRIMARY_KISS]
+)
+
 # Service schemas
 _SEND_MESSAGE_SCHEMA = vol.Schema(
     {
         vol.Required("to"): cv.string,
         vol.Required("message"): cv.string,
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_NO_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_BULLETIN_SCHEMA = vol.Schema(
@@ -51,6 +68,8 @@ _SEND_BULLETIN_SCHEMA = vol.Schema(
         vol.Required("bulletin_id"): cv.string,
         vol.Required("message"): cv.string,
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_ANNOUNCEMENT_SCHEMA = vol.Schema(
@@ -58,6 +77,8 @@ _SEND_ANNOUNCEMENT_SCHEMA = vol.Schema(
         vol.Required("announcement_id"): vol.All(cv.string, vol.Length(min=1, max=1)),
         vol.Required("message"): cv.string,
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_WX_SCHEMA = vol.Schema(
@@ -75,6 +96,8 @@ _SEND_WX_SCHEMA = vol.Schema(
         vol.Optional("latitude"): vol.Coerce(float),
         vol.Optional("longitude"): vol.Coerce(float),
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_OBJECT_SCHEMA = vol.Schema(
@@ -86,12 +109,16 @@ _SEND_OBJECT_SCHEMA = vol.Schema(
         vol.Optional("symbol_code", default=">"): vol.All(cv.string, vol.Length(min=1, max=1)),
         vol.Optional("comment", default=""): cv.string,
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _DELETE_OBJECT_SCHEMA = vol.Schema(
     {
         vol.Required("object_name"): cv.string,
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_WX_ENTITIES_SCHEMA = vol.Schema(
@@ -109,6 +136,8 @@ _SEND_WX_ENTITIES_SCHEMA = vol.Schema(
         vol.Optional("latitude"): vol.Coerce(float),
         vol.Optional("longitude"): vol.Coerce(float),
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 _SEND_POSITION_SCHEMA = vol.Schema(
@@ -122,6 +151,8 @@ _SEND_POSITION_SCHEMA = vol.Schema(
         vol.Optional("course"): vol.All(vol.Coerce(int), vol.Range(min=0, max=360)),
         vol.Optional("altitude_ft"): vol.Coerce(int),
         vol.Optional("from_call"): cv.string,
+        vol.Optional(CONF_TRANSPORT, default=TRANSPORT_AUTO): _TRANSPORT_WITH_BOTH,
+        vol.Optional(CONF_NOGATE, default=False): cv.boolean,
     }
 )
 
@@ -220,6 +251,8 @@ def _register_services(hass: HomeAssistant) -> None:
             to=call.data["to"],
             message=call.data["message"],
             from_call=call.data.get("from_call"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_bulletin(call: ServiceCall) -> None:
@@ -228,6 +261,8 @@ def _register_services(hass: HomeAssistant) -> None:
             bulletin_id=call.data["bulletin_id"],
             message=call.data["message"],
             from_call=call.data.get("from_call"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_announcement(call: ServiceCall) -> None:
@@ -236,6 +271,8 @@ def _register_services(hass: HomeAssistant) -> None:
             announcement_id=call.data["announcement_id"],
             message=call.data["message"],
             from_call=call.data.get("from_call"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_wx_report(call: ServiceCall) -> None:
@@ -245,6 +282,8 @@ def _register_services(hass: HomeAssistant) -> None:
             from_call=call.data.get("from_call"),
             latitude=call.data.get("latitude"),
             longitude=call.data.get("longitude"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_object(call: ServiceCall) -> None:
@@ -257,6 +296,8 @@ def _register_services(hass: HomeAssistant) -> None:
             symbol_code=call.data.get("symbol_code", ">"),
             comment=call.data.get("comment", ""),
             from_call=call.data.get("from_call"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_delete_object(call: ServiceCall) -> None:
@@ -269,6 +310,8 @@ def _register_services(hass: HomeAssistant) -> None:
             symbol_code=">",
             from_call=call.data.get("from_call"),
             killed=True,
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_wx_from_entities(call: ServiceCall) -> None:
@@ -291,6 +334,8 @@ def _register_services(hass: HomeAssistant) -> None:
             from_call=call.data.get("from_call"),
             latitude=call.data.get("latitude"),
             longitude=call.data.get("longitude"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     async def handle_send_position(call: ServiceCall) -> None:
@@ -305,6 +350,8 @@ def _register_services(hass: HomeAssistant) -> None:
             course=call.data.get("course"),
             altitude_ft=call.data.get("altitude_ft"),
             from_call=call.data.get("from_call"),
+            transport=call.data.get(CONF_TRANSPORT, TRANSPORT_AUTO),
+            nogate=call.data.get(CONF_NOGATE, False),
         )
 
     hass.services.async_register(DOMAIN, SERVICE_SEND_MESSAGE, handle_send_message, _SEND_MESSAGE_SCHEMA)

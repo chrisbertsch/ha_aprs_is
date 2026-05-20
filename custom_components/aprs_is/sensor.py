@@ -93,6 +93,14 @@ async def async_setup_entry(
             WxBeaconLastSentSensor(coordinator, dev),
         ]
 
+    if coordinator.kiss_configured:
+        entities += [
+            KissTncConnectedSensor(coordinator),
+            KissTncRxPacketsSensor(coordinator),
+            KissTncTxPacketsSensor(coordinator),
+            KissTncTxMessagesSensor(coordinator),
+        ]
+
     async_add_entities(entities)
 
 
@@ -103,9 +111,19 @@ async def async_setup_entry(
 def _connection_device(coordinator: AprsIsCoordinator) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, coordinator.callsign)},
-        name=coordinator.callsign,
+        name=f"{coordinator.callsign} APRS-IS",
         manufacturer="APRS-IS",
         model="Connection",
+    )
+
+
+def _station_beacon_device(coordinator: AprsIsCoordinator) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.entry.entry_id}_station_beacon")},
+        name=f"{coordinator.callsign} Station Beacon",
+        manufacturer="APRS-IS",
+        model="Station Beacon",
+        via_device=(DOMAIN, coordinator.callsign),
     )
 
 
@@ -136,6 +154,16 @@ def _wx_beacon_device(coordinator: AprsIsCoordinator) -> DeviceInfo:
         name=f"{coordinator.wx_beacon_callsign} (Weather Beacon)",
         manufacturer="APRS-IS",
         model="Weather Beacon",
+        via_device=(DOMAIN, coordinator.callsign),
+    )
+
+
+def _kiss_tnc_device(coordinator: AprsIsCoordinator) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.entry.entry_id}_kiss_tnc")},
+        name=f"{coordinator.callsign} KISS TNC",
+        manufacturer="KISS TNC",
+        model="TCP KISS",
         via_device=(DOMAIN, coordinator.callsign),
     )
 
@@ -293,7 +321,7 @@ class BeaconLastSentSensor(_AprsIsSensorBase):
     def __init__(self, coordinator: AprsIsCoordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.entry.entry_id}_beacon_last_sent"
-        self._attr_device_info = _connection_device(coordinator)
+        self._attr_device_info = _station_beacon_device(coordinator)
 
     @property
     def available(self) -> bool:
@@ -641,4 +669,110 @@ class WxBeaconLastSentSensor(_AprsIsSensorBase):
 
     def _handle_callback(self, data: dict) -> None:
         if data.get("type") in ("wx_beacon_sent", "connection_status"):
+            self.async_write_ha_state()
+
+
+# ---------------------------------------------------------------------------
+# KISS TNC sensors
+# ---------------------------------------------------------------------------
+
+class KissTncConnectedSensor(_AprsIsSensorBase):
+    _attr_name = "Connection"
+    _attr_icon = "mdi:radio-tower"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AprsIsCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_kiss_connection"
+        self._attr_device_info = _kiss_tnc_device(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return "connected" if self.coordinator.kiss_connected else "disconnected"
+
+    def _handle_callback(self, data: dict) -> None:
+        if data.get("type") == "kiss_connection_status":
+            self.async_write_ha_state()
+
+
+class KissTncRxPacketsSensor(_AprsIsSensorBase):
+    _attr_name = "Packets Received"
+    _attr_icon = "mdi:download-network"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "packets"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AprsIsCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_kiss_rx_packets"
+        self._attr_device_info = _kiss_tnc_device(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.kiss_rx_packets
+
+    def _handle_callback(self, data: dict) -> None:
+        if data.get("type") in ("kiss_rx_update", "kiss_connection_status"):
+            self.async_write_ha_state()
+
+
+class KissTncTxPacketsSensor(_AprsIsSensorBase):
+    _attr_name = "Packets Sent"
+    _attr_icon = "mdi:upload-network"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "packets"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AprsIsCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_kiss_tx_packets"
+        self._attr_device_info = _kiss_tnc_device(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.kiss_tx_packets
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"last_raw": (self.coordinator.last_tx_packet or "")[:120]}
+
+    def _handle_callback(self, data: dict) -> None:
+        if data.get("type") in ("kiss_tx_update", "kiss_connection_status"):
+            self.async_write_ha_state()
+
+
+class KissTncTxMessagesSensor(_AprsIsSensorBase):
+    _attr_name = "Messages Sent"
+    _attr_icon = "mdi:message-arrow-right"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "messages"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: AprsIsCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_kiss_tx_messages"
+        self._attr_device_info = _kiss_tnc_device(coordinator)
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.kiss_tx_messages
+
+    def _handle_callback(self, data: dict) -> None:
+        if data.get("type") in ("kiss_tx_update", "kiss_connection_status"):
             self.async_write_ha_state()

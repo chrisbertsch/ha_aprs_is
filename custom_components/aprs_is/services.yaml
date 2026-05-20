@@ -21,6 +21,27 @@ send_message:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Auto = primary with automatic fallback. Both is not available for messages — use auto, aprs_is, or kiss_tnc."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path, instructing IGates not to forward this packet to the internet. Only applies when transmitting via KISS TNC.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_bulletin:
   name: Send APRS Bulletin
@@ -46,6 +67,29 @@ send_bulletin:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both (NOGATE is always forced in that mode).
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_announcement:
   name: Send APRS Announcement
@@ -71,6 +115,29 @@ send_announcement:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_wx_report:
   name: Send APRS Weather Report
@@ -202,6 +269,29 @@ send_wx_report:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_object:
   name: Send APRS Object
@@ -260,6 +350,29 @@ send_object:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 delete_object:
   name: Delete APRS Object
@@ -277,6 +390,29 @@ delete_object:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_wx_report_from_entities:
   name: Send APRS Weather Report (from entities)
@@ -396,6 +532,29 @@ send_wx_report_from_entities:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 send_position:
   name: Send APRS Position Report
@@ -478,3 +637,26 @@ send_position:
       required: false
       selector:
         text:
+    transport:
+      name: Transport
+      description: "Which transport to use. Both sends on APRS-IS and KISS TNC simultaneously (NOGATE is forced on the RF copy)."
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - label: "Auto (primary with fallback)"
+              value: "auto"
+            - label: "Both (APRS-IS + KISS TNC)"
+              value: "both"
+            - label: "APRS-IS"
+              value: "aprs_is"
+            - label: "KISS TNC (RF)"
+              value: "kiss_tnc"
+    nogate:
+      name: NOGATE
+      description: Append NOGATE to the AX.25 path. Only applies when transmitting via KISS TNC. Ignored when transport is Both.
+      required: false
+      default: false
+      selector:
+        boolean:

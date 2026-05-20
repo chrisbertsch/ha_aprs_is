@@ -17,11 +17,11 @@ CONF_PORT = "port"
 CONF_STATIONS = "stations"
 CONF_WEATHER_STATIONS = "weather_stations"
 CONF_EVENT_RATE_LIMIT = "event_rate_limit"
-# Range filter uses HA's configured home lat/lon automatically
-CONF_RANGE_FILTER_RADIUS = "range_filter_radius"
-# Appended verbatim after the auto-generated filter string
-CONF_FILTER_EXTRA = "filter_extra"
 CONF_BEACON_INTERVAL = "beacon_interval"
+CONF_BEACON_COMMENT = "beacon_comment"
+CONF_BEACON_SYMBOL = "beacon_symbol"
+CONF_BEACON_TRANSPORT = "beacon_transport"
+CONF_WX_BEACON_TRANSPORT = "wx_beacon_transport"
 
 # WX beacon options
 CONF_WX_BEACON_INTERVAL = "wx_beacon_interval"
@@ -52,14 +52,20 @@ POSITION_TYPE_GEO_LOCATION = "geo_location"
 
 # Defaults
 DEFAULT_EVENT_RATE_LIMIT = 0  # 0 = unlimited
-DEFAULT_RANGE_FILTER_RADIUS = 0  # 0 = disabled
 DEFAULT_BEACON_INTERVAL = 0  # 0 = disabled
+DEFAULT_BEACON_COMMENT = "Home Assistant"
+DEFAULT_BEACON_SYMBOL = "/-"  # house symbol (table /, code -)
 DEFAULT_WX_BEACON_INTERVAL = 0  # 0 = disabled
 DEFAULT_WX_STALENESS_MAX_AGE = 10  # minutes
 
 # APRS-IS login banner
 APRS_SOFTWARE_NAME = "homeassistant-aprs-is"
 APRS_SOFTWARE_VERSION = "0.1.0"
+
+# APRS destination / TOCALL — identifies this software to the network.
+# APZ prefix = experimental/unregistered per the APRS spec.
+# Intent: register a permanent TOCALL via aprs.org/aprs11/tocalls.txt.
+APRS_TOCALL = "APZHA"
 
 # HA event names
 EVENT_PACKET_RECEIVED = f"{DOMAIN}_packet_received"
@@ -76,6 +82,25 @@ PACKET_TYPE_MESSAGE = "message"
 PACKET_TYPE_OBJECT = "object"
 PACKET_TYPE_STATUS = "status"
 PACKET_TYPE_BULLETIN = "bulletin"
+
+# KISS TNC options
+CONF_KISS_HOST    = "kiss_host"
+CONF_KISS_PORT    = "kiss_port"
+CONF_KISS_RF_PATH = "kiss_rf_path"
+CONF_TX_PRIMARY   = "tx_primary"
+
+TX_PRIMARY_APRS_IS = "aprs_is"
+TX_PRIMARY_KISS    = "kiss_tnc"
+
+DEFAULT_KISS_PORT    = 8001
+DEFAULT_KISS_RF_PATH = "WIDE1-1,WIDE2-1"
+DEFAULT_TX_PRIMARY   = TX_PRIMARY_APRS_IS
+
+# Per-service-call transport override
+CONF_TRANSPORT = "transport"
+CONF_NOGATE    = "nogate"
+TRANSPORT_AUTO = "auto"
+TRANSPORT_BOTH = "both"
 
 # HA service/action names
 SERVICE_SEND_MESSAGE = "send_message"
